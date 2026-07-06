@@ -1,1 +1,808 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traductor Fonético - Powered by OpenAI</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .code-font {
+            font-family: 'Fira Code', monospace;
+        }
+        /* Custom Scrollbar for console and history */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(51, 65, 85, 0.8);
+            border-radius: 3px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(71, 85, 105, 1);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between bg-slate-950">
 
+    <!-- Header / Navbar -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-green-600 flex items-center justify-center shadow-lg shadow-green-500/20">
+                    <!-- OpenAI custom icon style branding -->
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-400">Traductor Fonético</h1>
+                    <p class="text-xs text-slate-400">Español ➔ Inglés • OpenAI GPT Engine</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <!-- Toggle developer console -->
+                <button 
+                    id="toggle-console-btn" 
+                    class="flex items-center space-x-1.5 text-xs bg-slate-800/80 hover:bg-slate-700/80 px-3 py-1.5 rounded-full border border-slate-700/50 transition-all text-slate-300 hover:text-white"
+                    title="Mostrar u ocultar la consola de desarrollo"
+                >
+                    <span>🛠️</span>
+                    <span class="font-medium">Consola</span>
+                </button>
+
+                <!-- API configuration trigger button -->
+                <button 
+                    id="open-settings-btn"
+                    class="flex items-center space-x-1.5 text-xs bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white px-3 py-1.5 rounded-full border border-emerald-500/30 transition-all font-medium"
+                >
+                    <span>🔑</span>
+                    <span id="api-status-text">Configurar API</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Settings Modal (Glassmorphism overlay) -->
+    <div id="settings-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative transition-all duration-300 transform scale-95 opacity-0" id="modal-box">
+            <h3 class="text-lg font-bold text-white mb-2 flex items-center space-x-2">
+                <span>🔑</span>
+                <span>Configurar OpenAI API</span>
+            </h3>
+            <p class="text-xs text-slate-400 mb-4 leading-relaxed">
+                Tu clave API se almacena de forma segura de manera local en tu propio navegador y se envía directamente a OpenAI para procesar las traducciones.
+            </p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">OpenAI API Key (sk-...)</label>
+                    <input 
+                        type="password" 
+                        id="api-key-input" 
+                        placeholder="" 
+                        class="w-full bg-slate-950 text-white placeholder-slate-600 text-sm rounded-xl p-3 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Modelo de Inteligencia Artificial</label>
+                    <select 
+                        id="model-select" 
+                        class="w-full bg-slate-950 text-slate-200 text-sm rounded-xl p-3 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    >
+                        <option value="gpt-4o-mini" selected>gpt-4o-mini (Super rápido e ideal para traducciones)</option>
+                        <option value="gpt-4o">gpt-4o (Máxima precisión para frases complejas)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-slate-800 flex items-center justify-end space-x-3">
+                <button 
+                    id="close-settings-btn" 
+                    class="px-4 py-2 text-xs text-slate-400 hover:text-white transition-colors"
+                >
+                    Cancelar
+                </button>
+                <button 
+                    id="save-settings-btn" 
+                    class="px-5 py-2.5 bg-green-600 hover:bg-green-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-green-600/20 transition-all active:scale-95"
+                >
+                    Guardar Configuración
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <main class="flex-1 max-w-6xl w-full mx-auto p-4 md:py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left Column: Input, Quick Templates & Console -->
+        <div class="lg:col-span-2 space-y-6 flex flex-col">
+            
+            <!-- Translation Interface -->
+            <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-sm font-semibold tracking-wide uppercase text-green-400">Texto en Español</span>
+                        <span class="text-xs text-slate-500" id="char-counter">0 / 200 caract.</span>
+                    </div>
+                    
+                    <div class="relative">
+                        <textarea 
+                            id="input-text" 
+                            maxlength="200"
+                            placeholder="Escribe aquí una palabra, expresión o frase en español... (Ej: ¿Cómo estás?, Buenos días, Ferrocarril)" 
+                            class="w-full h-32 bg-slate-950/80 text-white placeholder-slate-500 rounded-xl p-4 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none text-lg transition-all"
+                        ></textarea>
+                        <button 
+                            id="clear-btn" 
+                            class="absolute right-3 top-3 text-slate-500 hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-slate-800 hidden"
+                            title="Limpiar entrada"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+
+                    <!-- Fast suggestions -->
+                    <div class="mt-4">
+                        <span class="text-xs text-slate-400 block mb-2 font-medium">Sugerencias rápidas para probar:</span>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="useQuickWord('Hola, ¿cómo estás?')" class="px-3 py-1.5 text-xs bg-slate-900 hover:bg-green-900/20 border border-slate-800 hover:border-green-500/50 rounded-lg text-slate-300 hover:text-white transition-all">¿Cómo estás?</button>
+                            <button onclick="useQuickWord('Muchas gracias')" class="px-3 py-1.5 text-xs bg-slate-900 hover:bg-green-900/20 border border-slate-800 hover:border-green-500/50 rounded-lg text-slate-300 hover:text-white transition-all">Muchas gracias</button>
+                            <button onclick="useQuickWord('Por favor')" class="px-3 py-1.5 text-xs bg-slate-900 hover:bg-green-900/20 border border-slate-800 hover:border-green-500/50 rounded-lg text-slate-300 hover:text-white transition-all">Por favor</button>
+                            <button onclick="useQuickWord('Ferrocarril')" class="px-3 py-1.5 text-xs bg-slate-900 hover:bg-green-900/20 border border-slate-800 hover:border-green-500/50 rounded-lg text-slate-300 hover:text-white transition-all">Ferrocarril</button>
+                            <button onclick="useQuickWord('Quiero aprender inglés')" class="px-3 py-1.5 text-xs bg-slate-900 hover:bg-green-900/20 border border-slate-800 hover:border-green-500/50 rounded-lg text-slate-300 hover:text-white transition-all">Quiero aprender</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-end">
+                    <button 
+                        id="translate-btn"
+                        class="w-full md:w-auto px-6 py-3 bg-green-600 hover:bg-green-500 active:scale-95 text-white font-semibold rounded-xl shadow-lg shadow-green-600/20 hover:shadow-green-500/30 transition-all flex items-center justify-center space-x-2"
+                    >
+                        <span>Traducir y Pronunciar</span>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Custom Console Display (Hidden by default) -->
+            <div id="console-container" class="hidden bg-slate-950 border border-slate-900 rounded-2xl p-4 flex flex-col h-64 shadow-inner">
+                <div class="flex items-center justify-between border-b border-slate-900 pb-2 mb-3">
+                    <div class="flex items-center space-x-2">
+                        <span class="flex space-x-1">
+                            <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
+                            <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
+                            <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+                        </span>
+                        <span class="text-xs text-slate-400 font-mono pl-2">Consola de Desarrollo Activa</span>
+                    </div>
+                    <button 
+                        onclick="clearConsole()" 
+                        class="text-[10px] text-slate-500 hover:text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 transition-colors"
+                    >
+                        Limpiar
+                    </button>
+                </div>
+                <div id="console-output" class="flex-1 overflow-y-auto text-xs font-mono text-emerald-400 space-y-2 pr-2 custom-scroll">
+                    <div class="text-slate-500">// Logs de comunicación de OpenAI en tiempo real...</div>
+                    <div class="text-slate-500">// Configura tu API Key e ingresa una palabra...</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Results & Phonetic Box -->
+        <div class="space-y-6 flex flex-col justify-start">
+            
+            <!-- Big Translation Output -->
+            <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between min-h-[300px]">
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-semibold tracking-wide uppercase text-cyan-400">Traducción Fonética</span>
+                        <span class="text-xs text-slate-500">Resultado obtenido</span>
+                    </div>
+
+                    <!-- Loader State -->
+                    <div id="loading-state" class="hidden py-12 flex flex-col items-center justify-center space-y-3">
+                        <div class="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                        <span class="text-sm text-slate-400">Consultando a OpenAI...</span>
+                    </div>
+
+                    <!-- Idle / Placeholder State -->
+                    <div id="idle-state" class="py-12 text-center text-slate-500 space-y-3">
+                        <svg class="w-12 h-12 mx-auto text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                        <p class="text-sm px-4">Configura tu llave, escribe una frase y presiona "Traducir".</p>
+                    </div>
+
+                    <!-- Content State -->
+                    <div id="result-state" class="hidden space-y-5">
+                        
+                        <!-- English Translation -->
+                        <div>
+                            <span class="text-xs text-slate-400 block mb-1">En Inglés se escribe:</span>
+                            <div class="flex items-center justify-between bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                                <span id="out-english" class="text-xl font-bold text-white tracking-wide">...</span>
+                                <div class="flex space-x-1.5">
+                                    <!-- Copy Button -->
+                                    <button id="copy-btn" class="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-all" title="Copiar traducción">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                                    </button>
+                                    <!-- Speak English Button -->
+                                    <button id="speak-btn" class="p-2 bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white rounded-lg transition-all" title="Escuchar pronunciación nativa">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Spanish-Friendly Phonetics (The main request!) -->
+                        <div>
+                            <span class="text-xs text-slate-400 block mb-1">Pronúncialo así (leído en Español):</span>
+                            <div class="bg-green-950/30 border border-green-500/20 p-4 rounded-xl flex items-center justify-between">
+                                <div class="flex-1">
+                                    <span id="out-phonetic" class="text-2xl font-black text-amber-300 tracking-wide select-all block">...</span>
+                                    <span class="text-[10px] text-slate-400 mt-1.5 block">Acentúa las sílabas con tilde para una entonación ideal.</span>
+                                </div>
+                                <div class="flex flex-col space-y-1 ml-3 shrink-0">
+                                    <button id="speak-phonetic-btn" class="w-10 h-10 rounded-full bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 flex items-center justify-center text-amber-400 transition-all" title="Escuchar cómo leerlo en español">
+                                        🗣️
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Example Sentences -->
+                        <div class="bg-slate-950/40 p-4 rounded-xl border border-slate-800 space-y-2">
+                            <span class="text-[11px] font-semibold uppercase text-slate-400 tracking-wider block">Ejemplo contextualizado:</span>
+                            <p id="out-example-en" class="text-sm font-medium text-slate-200">...</p>
+                            <p id="out-example-es" class="text-xs text-slate-400 italic">...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custom In-App Toast Notification -->
+                <div id="toast-notification" class="hidden mt-4 p-3 bg-green-900/40 border border-green-500/30 text-green-200 rounded-xl text-center text-xs transition-all duration-300">
+                    <!-- Dynamic message goes here -->
+                </div>
+
+                <!-- Footer tip -->
+                <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                    <span>💡 Tip: La tilde te marca el acento en inglés.</span>
+                </div>
+            </div>
+
+            <!-- Recent History Feature -->
+            <div class="bg-slate-900/30 border border-slate-900 rounded-2xl p-4 flex flex-col space-y-3">
+                <span class="text-xs font-semibold tracking-wider uppercase text-slate-400 block">Historial Reciente</span>
+                <div id="history-container" class="max-h-40 overflow-y-auto space-y-2 custom-scroll text-xs">
+                    <p class="text-slate-600 text-center py-2 italic">Aún no hay búsquedas registradas.</p>
+                </div>
+            </div>
+
+            <!-- Fast Facts Info Box -->
+            <div class="bg-slate-900/10 border border-slate-900 rounded-2xl p-4 text-xs text-slate-400 space-y-2.5">
+                <div class="flex items-center space-x-2 text-slate-300 font-semibold mb-1">
+                    <span>❓ ¿Cómo funciona la fonética en español?</span>
+                </div>
+                <p>El inglés tiene fonemas que no existen en español. Para solucionarlo:</p>
+                <ul class="list-disc list-inside space-y-1 text-slate-400">
+                    <li>La <strong class="text-green-300">"th"</strong> suave suele mapearse como una <strong class="text-green-300">"z"</strong> o <strong class="text-green-300">"d"</strong>.</li>
+                    <li>La <strong class="text-green-300">"r"</strong> inglesa se suaviza al máximo (se denota sutilmente).</li>
+                    <li>El sonido de la <strong class="text-green-300">"sh"</strong> se representa tal cual para diferenciarlo de la "ch".</li>
+                </ul>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-900 bg-slate-950/80 py-4 text-center text-xs text-slate-500">
+        <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <span>Powered by OpenAI Chat Completions Engine</span>
+            <span>Desarrollado con fines educativos de pronunciación instantánea • 2026</span>
+        </div>
+    </footer>
+
+    <!-- Custom Logic for Settings, Modals, LocalStorage and API integration -->
+    <script>
+        // DOM Elements
+        const inputText = document.getElementById('input-text');
+        const clearBtn = document.getElementById('clear-btn');
+        const translateBtn = document.getElementById('translate-btn');
+        const charCounter = document.getElementById('char-counter');
+        
+        const loadingState = document.getElementById('loading-state');
+        const idleState = document.getElementById('idle-state');
+        const resultState = document.getElementById('result-state');
+        
+        const outEnglish = document.getElementById('out-english');
+        const outPhonetic = document.getElementById('out-phonetic');
+        const outExampleEn = document.getElementById('out-example-en');
+        const outExampleEs = document.getElementById('out-example-es');
+        
+        const copyBtn = document.getElementById('copy-btn');
+        const speakBtn = document.getElementById('speak-btn');
+        const speakPhoneticBtn = document.getElementById('speak-phonetic-btn');
+        const toastNotification = document.getElementById('toast-notification');
+        const consoleOutput = document.getElementById('console-output');
+        const historyContainer = document.getElementById('history-container');
+
+        // Console Toggle DOM Elements
+        const toggleConsoleBtn = document.getElementById('toggle-console-btn');
+        const consoleContainer = document.getElementById('console-container');
+
+        // Settings Modal DOM Elements
+        const settingsModal = document.getElementById('settings-modal');
+        const modalBox = document.getElementById('modal-box');
+        const openSettingsBtn = document.getElementById('open-settings-btn');
+        const closeSettingsBtn = document.getElementById('close-settings-btn');
+        const saveSettingsBtn = document.getElementById('save-settings-btn');
+        const apiKeyInput = document.getElementById('api-key-input');
+        const modelSelect = document.getElementById('model-select');
+        const apiStatusText = document.getElementById('api-status-text');
+
+        // App States & Storage
+        let lastEnglishWord = "";
+        let lastPhoneticWord = "";
+        let translationHistory = [];
+        
+        // Load OpenAI settings from localStorage
+        let openaiApiKey = localStorage.getItem('openai_api_key') || '';
+        let openaiModel = localStorage.getItem('openai_model') || 'gpt-4o-mini';
+
+        // Initialize Settings Fields & Indicators
+        function initSettings() {
+            apiKeyInput.value = openaiApiKey;
+            modelSelect.value = openaiModel;
+            updateSettingsBadge();
+        }
+
+        function updateSettingsBadge() {
+            if (openaiApiKey) {
+                apiStatusText.textContent = "API Configurada ✅";
+                openSettingsBtn.className = "flex items-center space-x-1.5 text-xs bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white px-3 py-1.5 rounded-full border border-green-500/30 transition-all font-medium";
+            } else {
+                apiStatusText.textContent = "Falta API Key ⚠️";
+                openSettingsBtn.className = "flex items-center space-x-1.5 text-xs bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white px-3 py-1.5 rounded-full border border-rose-500/30 transition-all font-medium";
+            }
+        }
+
+        // Open Modal
+        openSettingsBtn.addEventListener('click', () => {
+            settingsModal.classList.remove('hidden');
+            setTimeout(() => {
+                modalBox.classList.remove('scale-95', 'opacity-0');
+                modalBox.classList.add('scale-100', 'opacity-100');
+            }, 50);
+        });
+
+        // Close Modal Helper
+        function closeModal() {
+            modalBox.classList.remove('scale-100', 'opacity-100');
+            modalBox.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                settingsModal.classList.add('hidden');
+            }, 300);
+        }
+
+        closeSettingsBtn.addEventListener('click', closeModal);
+
+        // Save Modal Configuration
+        saveSettingsBtn.addEventListener('click', () => {
+            const key = apiKeyInput.value.trim();
+            const modelSelected = modelSelect.value;
+
+            if (!key) {
+                showNotification("Por favor ingresa tu API Key.", "error");
+                return;
+            }
+
+            openaiApiKey = key;
+            openaiModel = modelSelected;
+
+            localStorage.setItem('openai_api_key', key);
+            localStorage.setItem('openai_model', modelSelected);
+
+            updateSettingsBadge();
+            showNotification("Configuración guardada correctamente");
+            closeModal();
+            logConsole("Ajustes", `API Key almacenada. Modelo activo: ${modelSelected}`);
+        });
+
+        // Track Text Area Input Events
+        inputText.addEventListener('input', (e) => {
+            const length = e.target.value.length;
+            charCounter.textContent = `${length} / 200 caract.`;
+            if (length > 0) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            inputText.value = "";
+            charCounter.textContent = "0 / 200 caract.";
+            clearBtn.classList.add('hidden');
+            inputText.focus();
+        });
+
+        // Trigger translation
+        translateBtn.addEventListener('click', () => {
+            const text = inputText.value.trim();
+            if (!text) {
+                logConsole("⚠️ Error", "La caja de texto está vacía. Por favor escribe algo.", true);
+                showNotification("Por favor, ingresa un texto para traducir.", "error");
+                return;
+            }
+            performTranslation(text);
+        });
+
+        // Use pre-selected quick cards
+        function useQuickWord(word) {
+            inputText.value = word;
+            charCounter.textContent = `${word.length} / 200 caract.`;
+            clearBtn.classList.remove('hidden');
+            performTranslation(word);
+        }
+
+        // Custom alert and notification system
+        function showNotification(message, type = "success") {
+            toastNotification.textContent = message;
+            toastNotification.className = "mt-4 p-3 rounded-xl text-center text-xs transition-all duration-300";
+            
+            if (type === "success") {
+                toastNotification.classList.add("bg-green-900/40", "border", "border-green-500/30", "text-green-200");
+            } else if (type === "error") {
+                toastNotification.classList.add("bg-rose-950/40", "border", "border-rose-500/30", "text-rose-200");
+            }
+            
+            toastNotification.classList.remove('hidden');
+            setTimeout(() => {
+                toastNotification.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Output logger for the built-in and developer console
+        function logConsole(title, data, isError = false) {
+            if (isError) {
+                console.error(`[${title}]:`, data);
+            } else {
+                console.log(`[${title}]:`, data);
+            }
+
+            const timestamp = new Date().toLocaleTimeString();
+            const logItem = document.createElement('div');
+            logItem.className = isError ? 'text-rose-400 mt-1' : 'text-emerald-400 mt-1';
+            
+            let formattedData = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+            
+            logItem.innerHTML = `
+                <span class="text-slate-500">[${timestamp}]</span> 
+                <span class="text-amber-400 font-semibold">${title}:</span> 
+                <pre class="bg-slate-950 p-2 rounded mt-1 overflow-x-auto whitespace-pre-wrap leading-relaxed border border-slate-900 custom-scroll">${formattedData}</pre>
+            `;
+            
+            consoleOutput.appendChild(logItem);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        // Clear Simulated Console
+        function clearConsole() {
+            consoleOutput.innerHTML = `<div class="text-slate-500">// Consola limpia. Esperando nuevos datos...</div>`;
+        }
+
+        // Add search to Local History
+        function addToHistory(originalText, translation, phonetics) {
+            if (translationHistory.some(item => item.original.toLowerCase() === originalText.toLowerCase())) return;
+
+            translationHistory.unshift({ original: originalText, translation, phonetics });
+            if (translationHistory.length > 5) translationHistory.pop(); // Max 5 items
+
+            renderHistory();
+        }
+
+        function renderHistory() {
+            if (translationHistory.length === 0) {
+                historyContainer.innerHTML = `<p class="text-slate-600 text-center py-2 italic">Aún no hay búsquedas registradas.</p>`;
+                return;
+            }
+
+            historyContainer.innerHTML = '';
+            translationHistory.forEach(item => {
+                const badge = document.createElement('div');
+                badge.className = "flex items-center justify-between p-2 rounded bg-slate-900 border border-slate-800 hover:border-green-500/40 transition-all cursor-pointer";
+                badge.onclick = () => {
+                    inputText.value = item.original;
+                    charCounter.textContent = `${item.original.length} / 200 caract.`;
+                    clearBtn.classList.remove('hidden');
+                    renderResult({
+                        traduccion: item.translation,
+                        pronunciacion_espanola: item.phonetics,
+                        ejemplo_ingles: "Seleccionado desde el historial.",
+                        ejemplo_espanol: "Selected from history."
+                    });
+                };
+                badge.innerHTML = `
+                    <div class="truncate pr-2">
+                        <span class="font-medium text-slate-200">${item.original}</span>
+                        <span class="text-slate-500"> ➔ ${item.translation}</span>
+                    </div>
+                    <span class="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded shrink-0">${item.phonetics}</span>
+                `;
+                historyContainer.appendChild(badge);
+            });
+        }
+
+        // Translate Call targeting OpenAI Chat Completions API
+        async function performTranslation(queryText) {
+            // Check if API Key is configured
+            if (!openaiApiKey) {
+                logConsole("⚠️ Error", "No se ha configurado la API Key de OpenAI.", true);
+                showNotification("Configura tu OpenAI API Key primero.", "error");
+                
+                // Auto trigger settings modal
+                openSettingsBtn.click();
+                return;
+            }
+
+            // Update UI State
+            idleState.classList.add('hidden');
+            resultState.classList.add('hidden');
+            loadingState.classList.remove('hidden');
+            translateBtn.disabled = true;
+            translateBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            logConsole("Petición OpenAI", `Texto original: "${queryText}" | Modelo: ${openaiModel}`);
+
+            const systemPrompt = `Eres un traductor de altísima precisión especialista en traducir del español al inglés.
+Tu característica principal y obligatoria es que debes incluir la transcripción de la pronunciación del inglés usando estrictamente las letras del alfabeto español de la forma más amigable, intuitiva y natural posible para que un hispanohablante nativo la pronuncie perfecto a la primera lectura.
+Reglas de la transcripción fonética en español:
+1. Usa tildes o mayúsculas en las sílabas donde recae la acentuación más fuerte (ej: "hello" -> "jelóu", "beautiful" -> "biútiful").
+2. Mapea la "th" inglesa que suena como "z" castellana o "d" según corresponda (ej: "thank you" -> "zánc iu").
+3. Representa la "r" inglesa como un sonido sutil o "r" suave (ej: "car" -> "car", "world" -> "guerld").
+4. Evita tecnicismos de símbolos fonéticos internacionales (IPA). Todo debe ser leíble por cualquier persona que solo sepa leer en español.
+
+Debes responder estrictamente en formato JSON utilizando el siguiente esquema:
+{
+  "original": "La palabra o frase original",
+  "traduccion": "La traducción correcta al inglés",
+  "pronunciacion_espanola": "La representación fonética explicada con letras del español",
+  "ejemplo_ingles": "Una frase corta de ejemplo en inglés usando la palabra/frase traducida",
+  "ejemplo_espanol": "La traducción de la frase corta de ejemplo al español"
+}`;
+
+            // OpenAI API endpoint
+            const openaiUrl = "https://api.openai.com/v1/chat/completions";
+
+            const payload = {
+                model: openaiModel,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: queryText }
+                ],
+                // Forcing JSON Mode output in OpenAI API
+                response_format: { type: "json_object" }
+            };
+
+            logConsole("Payload del Request (OpenAI Structure)", payload);
+
+            let responseData = null;
+            let success = false;
+            let retries = 3;
+            let delay = 1000;
+
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(openaiUrl, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${openaiApiKey}`
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errDetails = await response.text();
+                        throw new Error(`OpenAI API Error! Status: ${response.status}. Details: ${errDetails}`);
+                    }
+
+                    const result = await response.json();
+                    let textResponse = result.choices?.[0]?.message?.content;
+                    
+                    if (textResponse) {
+                        textResponse = textResponse.trim();
+                        responseData = JSON.parse(textResponse);
+                        success = true;
+                        break;
+                    } else {
+                        throw new Error("Respuesta vacía o formato de OpenAI inesperado");
+                    }
+
+                } catch (error) {
+                    logConsole(`Intento ${i+1} fallido`, error.message, true);
+                    if (i === retries - 1) {
+                        logConsole("Error final de API", error.message, true);
+                        showUserFriendlyError("Error al conectar con OpenAI. Revisa que tu API Key sea válida o tu conexión de red.");
+                        break;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2;
+                }
+            }
+
+            // Restore Translate Button
+            translateBtn.disabled = false;
+            translateBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            loadingState.classList.add('hidden');
+
+            if (success && responseData) {
+                logConsole("Respuesta recibida exitosamente", responseData);
+                renderResult(responseData);
+                addToHistory(queryText, responseData.traduccion, responseData.pronunciacion_espanola);
+            }
+        }
+
+        // Draw response to UI
+        function renderResult(data) {
+            lastEnglishWord = data.traduccion;
+            lastPhoneticWord = data.pronunciacion_espanola;
+            
+            outEnglish.textContent = data.traduccion;
+            outPhonetic.textContent = data.pronunciacion_espanola;
+            outExampleEn.textContent = data.ejemplo_ingles;
+            outExampleEs.textContent = data.ejemplo_espanol;
+
+            idleState.classList.add('hidden');
+            resultState.classList.remove('hidden');
+        }
+
+        // Fallback error UI
+        function showUserFriendlyError(message) {
+            idleState.innerHTML = `
+                <div class="text-rose-400 space-y-3 py-6">
+                    <svg class="w-12 h-12 mx-auto text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    <p class="font-bold text-sm">Error en la traducción</p>
+                    <p class="text-[11px] text-slate-400 px-4 leading-relaxed">${message}</p>
+                    <button onclick="retryLastTranslation()" class="mt-4 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 border border-slate-700 transition-colors text-xs font-semibold">Reintentar</button>
+                </div>
+            `;
+            idleState.classList.remove('hidden');
+        }
+
+        function retryLastTranslation() {
+            idleState.innerHTML = `
+                <svg class="w-12 h-12 mx-auto text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                <p class="text-sm">Configura tu llave, escribe una frase y presiona "Traducir".</p>
+            `;
+            const text = inputText.value.trim();
+            if (text) performTranslation(text);
+        }
+
+        // Copy utility using robust fallback API
+        copyBtn.addEventListener('click', () => {
+            const word = outEnglish.textContent;
+            if (!word || word === "...") return;
+
+            const tempTextArea = document.createElement("textarea");
+            tempTextArea.value = word;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showNotification(`¡"${word}" copiado al portapapeles!`);
+                    logConsole("Portapapeles", `Copiado con éxito: "${word}"`);
+                } else {
+                    logConsole("Portapapeles", "Error al intentar copiar el texto", true);
+                }
+            } catch (err) {
+                logConsole("Portapapeles", "No se pudo copiar de forma automática", true);
+            }
+            
+            document.body.removeChild(tempTextArea);
+        });
+
+        // Speech Synthesis - ENGLISH (Native voice)
+        speakBtn.addEventListener('click', () => {
+            if (!lastEnglishWord) return;
+
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(lastEnglishWord);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.9;
+                
+                const voices = window.speechSynthesis.getVoices();
+                const usVoice = voices.find(voice => voice.lang.includes('en-US') || voice.lang.includes('en-'));
+                if (usVoice) {
+                    utterance.voice = usVoice;
+                }
+                
+                window.speechSynthesis.speak(utterance);
+                logConsole("Audio TTS (Inglés)", `Reproduciendo: "${lastEnglishWord}"`);
+            } else {
+                logConsole("Audio TTS Error", "La síntesis de voz no está soportada en este navegador.", true);
+                showNotification("Tu navegador no soporta reproducción de voz.", "error");
+            }
+        });
+
+        // Speech Synthesis - PHONETICS (Spanish voice reads the spanish-spelled sounds)
+        speakPhoneticBtn.addEventListener('click', () => {
+            if (!lastPhoneticWord) return;
+
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+
+                const readReadyText = lastPhoneticWord.replace(/[-]/g, ' ');
+
+                const utterance = new SpeechSynthesisUtterance(readReadyText);
+                utterance.lang = 'es-ES';
+                utterance.rate = 0.85;
+                
+                const voices = window.speechSynthesis.getVoices();
+                const esVoice = voices.find(voice => voice.lang.includes('es-') || voice.lang.includes('es_'));
+                if (esVoice) {
+                    utterance.voice = esVoice;
+                }
+                
+                window.speechSynthesis.speak(utterance);
+                logConsole("Audio TTS (Fonética Española)", `Lector en español pronuncia: "${readReadyText}"`);
+            } else {
+                showNotification("Tu navegador no soporta reproducción de voz.", "error");
+            }
+        });
+
+        // Pre-populate voices array for speech synthesis
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = () => {
+                window.speechSynthesis.getVoices();
+            };
+        }
+
+        // Toggle Console Display logic
+        toggleConsoleBtn.addEventListener('click', () => {
+            consoleContainer.classList.toggle('hidden');
+            if (consoleContainer.classList.contains('hidden')) {
+                toggleConsoleBtn.classList.remove('bg-green-600/20', 'text-green-400', 'border-green-500/30');
+                toggleConsoleBtn.classList.add('bg-slate-800/80', 'text-slate-300', 'border-slate-700/50');
+            } else {
+                toggleConsoleBtn.classList.add('bg-green-600/20', 'text-green-400', 'border-green-500/30');
+                toggleConsoleBtn.classList.remove('bg-slate-800/80', 'text-slate-300', 'border-slate-700/50');
+            }
+        });
+
+        // Initialize Settings on load
+        window.onload = function() {
+            initSettings();
+        };
+    </script>
+</body>
+</html>
